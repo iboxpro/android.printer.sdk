@@ -1,10 +1,9 @@
 package ibox.pro.printer.sdk.external.example;
 
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -15,10 +14,15 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Set;
 
+import ibox.pro.printer.sdk.external.BluetoothPrinter;
 import ibox.pro.printer.sdk.external.Build;
 import ibox.pro.printer.sdk.external.IPrinterAdapter;
 import ibox.pro.printer.sdk.external.PrinterFactory;
@@ -33,6 +37,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private IPrinterAdapter mPrinter;
     private LinkedHashMap<String, String> devices = new LinkedHashMap<>();
+
+    private ActivityResultLauncher<String[]> checkBtPermissionsOnConnect = registerForActivityResult(
+        new ActivityResultContracts.RequestMultiplePermissions(),
+        result -> {
+            if (BluetoothPrinter.CheckBluetoothPermissions(this)) {
+                updateDevicesList();
+            } else {
+                Toast.makeText(this, R.string.error_permissions, Toast.LENGTH_LONG).show();
+            }
+        }
+    );
 
     private IProgressable<Boolean> connectProgress = new IProgressable<Boolean>() {
         @Override
@@ -74,13 +89,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
 
+    @SuppressLint("MissingPermission")
+    private void updateDevicesList() {
+        devices.clear();
+
+        devices.put("USB", IPrinterAdapter.USB_MODE);
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter != null) {
+            Set<BluetoothDevice> bondedDevices = adapter.getBondedDevices();
+            if (bondedDevices != null) {
+                for (BluetoothDevice device : bondedDevices) {
+                    devices.put(
+                        device.getName() == null || device.getName().isEmpty()
+                            ? device.getAddress()
+                            : device.getName(),
+                        device.getAddress());
+                    }
+            }
+        }
+
+        if (spnDevices != null && spnDevices.getAdapter() != null) {
+            ((ArrayAdapter<?>) spnDevices.getAdapter()).notifyDataSetChanged();
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        toolbar.setTitle("Ibox Printer SDK v" + Build.VERSIONCODE);
-        setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle("Ibox Printer SDK v" + Build.VERSIONCODE);
 
         spnModels = findViewById(R.id.spn_models);
         spnDevices = findViewById(R.id.spn_devices);
@@ -113,21 +150,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
 
-
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter != null) {
-            Set<BluetoothDevice> bondedDevices = adapter.getBondedDevices();
-            if (bondedDevices != null)
-                for (BluetoothDevice device : bondedDevices)
-                    devices.put(device.getName() == null || device.getName().length() == 0
-                                    ? device.getAddress()
-                                    : device.getName(),
-                            device.getAddress());
+        if (BluetoothPrinter.CheckBluetoothPermissions(this)) {
+            updateDevicesList();
+        } else {
+            checkBtPermissionsOnConnect.launch(BluetoothPrinter.GetMissingBluetoothPermissions(this).toArray(new String[] {}));
         }
+
         spnDevices.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, devices.keySet().toArray(new String[] {})));
 
-
         updateUI();
+
+        btnConnect.setOnClickListener(this);
+        btnDisconnect.setOnClickListener(this);
+        btnTest.setOnClickListener(this);
     }
 
     @Override

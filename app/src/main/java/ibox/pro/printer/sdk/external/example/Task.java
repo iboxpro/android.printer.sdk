@@ -90,6 +90,7 @@ public abstract class Task {
                 if (checkResponse(response)) response = printer.printBarcode(IPrinterAdapter.Barcode.QR, "this is qr code");
                 if (checkResponse(response)) response = printer.printBarcode(IPrinterAdapter.Barcode.Code128C, "128c code");
                 if (checkResponse(response)) response = printer.printBarcode(IPrinterAdapter.Barcode.EAN13, "12345");
+                if (checkResponse(response)) response = printer.printBarcode(IPrinterAdapter.Barcode.PDF417, "pdf417 code");
                 if (checkResponse(response)) {
                     Context context = this.context.get();
                     if (context != null) {
